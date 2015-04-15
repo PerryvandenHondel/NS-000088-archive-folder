@@ -1,9 +1,43 @@
-'	---------------------------------------------------------------------------
-'
-'	Archive files from a folder older than x days last modified to an
-'	archive file.
-'
-'	---------------------------------------------------------------------------
+''
+''	SCRIPT:
+''		archive-folder.vbs
+''
+''
+''	SCRIPT_ID:
+''		88
+''
+'' 
+''	DESCRIPTION:
+''		This scriptperforms the following actions:
+''		1) Collects files older than x days from a source folder
+''		2) Compresses the folder to a archive file using 7za.exe
+''		3) Deletes older archived files to keep x amount of files.
+''
+''
+''	VERSION:
+''		01	2015-04-15	First version
+'' 
+''	SUBS AND FUNCTIONs:
+''		Function GetScriptPath
+''		Function NumberAlign
+''		Function ProperDateFs
+''		Function ProperDateTime
+''		Function RunCommand
+''		Sub MakeFolder
+''		Sub ProcessSet
+''		Sub ScriptDone
+''		Sub ScriptInit
+''		Sub ScriptRun
+'' 		Sub CollectFilesBeforeArchiving
+'' 
+''	---------------------------------------------------------------------------
+''
+''
+''	Archive files from a folder older than x days last modified to an
+''	archive file.
+''
+''	---------------------------------------------------------------------------
+
 
 
 
@@ -60,6 +94,39 @@ End Sub
 
 
 
+Function ProperDateFs(ByVal dtmDateTime)
+	''
+	''	Convert a system formatted date time to a proper file system date time
+	''
+	''	Returns the current date time when no date time is specified by dtmDateTime
+	''
+	''	Returns a date time in format: YYYY-MM-DD
+	''
+	''	dtmDateTime 
+	''
+	''	blnFolder3
+	''		True: 	Uses '\' as the separator char in the date: YYYY\MM\DD
+	''		False:	Uses '-' as the separator char in the date: YYYY-MM-DD
+	''
+	Dim		strSeperator
+	Dim		strResult
+
+	strResult = ""
+	
+	If Len(dtmDateTime) = 0 Then
+		dtmDateTime = Now()
+	End If
+	
+	strSeperator = "-"
+	strResult = NumberAlign(Year(dtmDateTime), 4) & strSeperator 
+	strResult = strResult & NumberAlign(Month(dtmDateTime), 2) & strSeperator
+	strResult = strResult & NumberAlign(Day(dtmDateTime), 2)
+	
+	ProperDateFs = strResult
+End Function '' of Function ProperDateFS
+
+
+
 Function NumberAlign(ByVal intNumber, ByVal intLen)
 	'	
 	'	Returns a number aligned with zeros to a defined length
@@ -111,32 +178,104 @@ End Function
 
 
 
+Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, ByVal intKeepDays)
+	Dim		c
+	Dim		r
+	
+	WScript.Echo "Collecting files before archiving, please wait..."
+	
+	c = "robocopy.exe "
+	c = c & Chr(34) & strFolderSource & Chr(34) & " "
+	c = c & Chr(34) & strFolderCollect & Chr(34) & " "
+	c = c & "*.* "							'' All files
+	''c = c & "/move "						'' /move 		the files
+	c = c & "/z "							'' /z 			copy files in restartable mode 
+	c = c & "/s "							'' /s 			copy sub dirs
+	c = c & "/np "							'' /np 			no progress counter aka procent
+	c = c & "/r:5 "							''	/r			Restart in 5 secs.
+	c = c & "/w:10 "						'' 	/w			Wait bewteen retries for 10 sec.
+	c = c & "/minlad:" & intKeepDays & " "  '' Not used for intKeepDays for Last Access Date (/minlad)
+	
+	''c = c & "/create "						'' TEST: Create 0 length files and folder stryucture
+	''c = c & "/l " 							'' TEST: Testing, do only log, not actually move files.
+	c = c & "/tee " 						'' TEST: Log to file and screen both.
+	
+	c = c & "/log:robocopy-collect.txt"
+	
+	WScript.Echo c
+	r = RunCommand(c)
+	WScript.Echo "CollectFilesBeforeArchiving=" & r
+	
+End Sub '' of Sub CollectFilesBeforeArchiving
+
+
+Sub CompressCollectedFiles(strFolderCollect, strPathArchive)
+	Dim		c
+	
+	'' 7za.exe a -r D:\archive-older-then\d_temp.7z D:\archive-older-then\d_temp\*.* 
+	
+	WScript.Echo
+	WScript.Echo "CompressCollectedFiles()" 
+	
+	c = "7za.exe "
+	c =	c & "a "
+	c = c & "-r "
+	c = c & Chr(34) & strPathArchive & Chr(34) & " "
+	c = c & Chr(34) & strFolderCollect & "\*.*" & Chr(34)
+	
+	WScript.Echo c
+End Sub '' of Sub CompressCollectedFiles
+
+
 
 Sub ProcessSet(ByVal strSet)
-	Dim		strSourceFolder
+	Dim		stFolderSource
 	Dim		intActive           	'' 1=ACTIVE, 0=INACTIVE 
 	Dim		strPathArchive 			'' 
 	Dim		strFolderArchive   		''
+	Dim		strFolderCollect
 	Dim		intKeepDays				'' 
 	Dim		intKeepArchives			''
 	Dim		strCmd
 	Dim		i
+	Dim		strDateArchive
+	Dim		dtmDateArchive
+	Dim		intDaysBack
+	Dim		strFilenameArchive
 	
+	WScript.Echo 
 	WScript.Echo "ProcessSet(): " & strSet
 	
 	intActive = Int(ReadConfig(strSet, "Active"))
 	If intActive = 1 Then
-		strSourceFolder = ReadConfig(strSet, "SourceFolder")
+		stFolderSource = ReadConfig(strSet, "SourceFolder")
 		strFolderArchive = ReadConfig(strSet, "FolderArchive")
 		
 		intKeepDays = Int(ReadConfig(strSet, "KeepDays"))
 		intKeepArchives = Int(ReadConfig(strSet, "KeepArchives"))
 		
+		intDaysBack = intKeepDays - (2 * intKeepDays)
+		dtmDateArchive = DateAdd("d", intDaysBack, Now())
+		strFilenameArchive = ProperDateFs(dtmDateArchive)
+
+		'strFolderCollect = strFolderArchive & "\" & strSet
+		strFolderCollect = "D:\Temp\~" & strSet
 		
-		WScript.Echo vbTab & "  Source folder : " & strSourceFolder
+		strPathArchive = strFolderArchive & "\" & strSet & "\" & strFilenameArchive & ".7z"
+		
+		WScript.Echo vbTab & "  Source folder : " & stFolderSource
 		WScript.Echo vbTab & "Archived folder : " & strFolderArchive
-		WScript.Echo vbtab & "      Keep days : " & intKeepDays
+		WScript.Echo vbTab & "      Keep days : " & intKeepDays
+		WScript.Echo vbtab & " Collect folder : " & strFolderCollect
+		WScript.Echo vbTab & "   Archive date : " & dtmDateArchive
+		WScript.Echo vbTab & "   Path archive : " & strPathArchive
 		WScript.Echo vbTab & "  Keep archives : " & intKeepArchives
+		
+		
+		Call CollectFilesBeforeArchiving(stFolderSource, strFolderCollect, intKeepDays)
+	
+		Call CompressCollectedFiles(strFolderCollect, strPathArchive)
+		
 		
 		
 	Else
@@ -439,5 +578,28 @@ Function GetProgramPath(sProgName)
 	'= 2011-02-16 Removed the Chr(34); was not working.
 	GetProgramPath = sReturn
 End Function '' GetProgramPath
+
+
+Function RunCommand(sCommandLine)
+	''
+	''	RunCommand(sCommandLine)
+	''
+	''	Run a DOS command and wait until execution is finished before the script can commence further.
+	''
+	''	Input
+	''		sCommandLine	Contains the complete command line to execute 
+	''
+	Dim oShell
+	Dim sCommand
+	Dim	nReturn
+
+	Set oShell = WScript.CreateObject("WScript.Shell")
+	sCommand = "CMD /c " & sCommandLine
+	' 0 = Console hidden, 1 = Console visible, 6 = In tool bar only
+	'LogWrite "RunCommand(): " & sCommandLine
+	nReturn = oShell.Run(sCommand, 6, True)
+	Set oShell = Nothing
+	RunCommand = nReturn 
+End Function '' RunCommand
 
 ''	EOS
