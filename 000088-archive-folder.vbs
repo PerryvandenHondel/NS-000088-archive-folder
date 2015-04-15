@@ -63,10 +63,9 @@ Call ScriptDone()
 Sub ScriptInit()
 	'gstrFolder = "d:\lazarus" 
 
-	gintCount = 0
+	'gintCount = 0
 	
-	gstrPathArchiver = GetProgramPath("pkzip25.exe")
-	
+	'gstrPathArchiver = GetProgramPath("pkzip25.exe")
 	
 	Set gobjFso = CreateObject("Scripting.FileSystemObject")
 End Sub
@@ -83,6 +82,9 @@ Sub ScriptRun()
 	For x = 0 To UBound(arrSets)
 		Call ProcessSet(arrSets(x))
 	Next
+	
+	'Call KeepArchives("
+	
 End Sub
 
 
@@ -138,46 +140,6 @@ End Function ' of NumberAlign
 
 
 
-Function GetBeforeDateZip(ByVal intDays)
-	'
-	'	Get the date for the before option of PKZIP. -before=MMDDYYYY
-	'
-	
-	Dim		dtBefore
-	Dim		r
-	
-	' Make a positive number negative (x - (2 * x))
-	intDays = intDays - (2 * intDays)
-
-	' Calculate the date intDays before
-	dtBefore = DateAdd("d", intDays, Now())
-	
-	' Return the dtBefore in MMDDYYYY format to be used by PKZIP25 -before option
-	GetBeforeDateZip = NumberAlign(Month(dtBefore), 2) & NumberAlign(Day(dtBefore), 2) & NumberAlign(Year(dtBefore), 4)
-End Function
-
-
-Function GetBeforeDateArchive(ByVal intDays)
-	'
-	'	Get the date for the archive file based on the intDays ago (format: yyyyMmm)
-	'
-	'
-	
-	Dim		dtBefore
-	Dim		r
-	
-	' Make a positive number negative (x - (2 * x))
-	intDays = intDays - (2 * intDays)
-
-	' Calculate the date intDays before
-	dtBefore = DateAdd("d", intDays, Now())
-	
-	' Return the dtBefore in yyyyMmm to name the archive file by month.
-	GetBeforeDateArchive =  NumberAlign(Year(dtBefore), 4) & "M" & NumberAlign(Month(dtBefore), 2)
-End Function
-
-
-
 Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, ByVal intKeepDays)
 	Dim		c
 	Dim		r
@@ -207,6 +169,7 @@ Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, B
 	WScript.Echo "CollectFilesBeforeArchiving=" & r
 	
 End Sub '' of Sub CollectFilesBeforeArchiving
+
 
 
 Sub CompressCollectedFiles(strFolderCollect, strPathArchive)
@@ -240,6 +203,86 @@ Sub CompressCollectedFiles(strFolderCollect, strPathArchive)
 		WScript.Echo "ERROR: Compression of " & strFolderCollect & " failed with code: " & r
 	End If
 End Sub '' of Sub CompressCollectedFiles
+
+
+
+Sub KeepNewestFiles(ByVal sFolder, ByVal nToKeep)
+	''
+	''	Keep an amount of files in a folder based on LastModifiedDate, 
+	''	oldest files are deleted.
+	''
+	'' 	Call KeepNewestFilesExt("C:\Temp", ".log", 3)
+	''
+	''	Input:
+	''		sFolder		Folder to check
+	''		nToKeep		Number of files to keep
+	''
+	Dim	aFolder()
+	Dim	m
+	Dim	n
+	Dim	nFolders
+	Dim	oFSO
+	Dim	oFile
+	Dim	oFolder
+	Dim	tmp0
+	Dim	tmp1
+	Dim	x
+	
+	Set oFSO = CreateObject("Scripting.FileSystemObject")
+	Set oFolder = oFSO.GetFolder(sFolder)
+	
+	'' Get the number of files in the folder.
+	nFolders = oFolder.Files.Count
+	
+	'' Resize the array to match the number of files.
+	ReDim aFolder(nFolders, 1)
+
+	n = 1
+	
+	'' Get all files in the  folder and place them in the 2D array.
+	For Each oFile in oFolder.Files
+		WScript.Echo vbTab & n & ":" & vbTab & oFile.Path & vbTab & oFile.DateLastModified
+		aFolder(n,0) = oFile.DateLastModified	
+		aFolder(n,1) = oFile.Path		'' Name
+		n = n + 1
+	Next
+	
+	'' Sort the array by dates, newest first
+	x = n - 1
+	For n = 1 to x - 1
+		For m = n + 1 to x
+			If aFolder(m, 0) > aFolder(n, 0) then
+				tmp0 = aFolder(m, 0)
+				tmp1 = aFolder(m, 1)
+				aFolder(m, 0) = aFolder(n, 0)
+				aFolder(m, 1) = aFolder(n, 1)
+				aFolder(n, 0) = tmp0
+				aFolder(n, 1) = tmp1
+			End If
+		Next
+	Next
+
+	WScript.Echo 
+	'' If the number of files to keep is larger then the number of folders in the folder.
+	If nFolders > nToKeep Then
+		WScript.Echo  vbTab & x & ":" & vbTab & aFolder(x, 1) & vbTab & aFolder(x, 0) & vbTab
+		For x = nToKeep + 1 To nFolders
+			WScript.Echo vbTab & vbTab & "DELETE"
+			'oFSO.DeleteFile aFolder(x, 1)
+			
+			If Err.Number <> 0 Then
+				WScript.Echo "Could not delete file " & aFolder(x, 1)
+			End If
+		Next
+	Else
+		WScript.Echo "Nothing to delete!"
+	End If
+	
+	Set oFolder = Nothing
+	Set oFSO = Nothing
+End Sub '' of Sub KeepNewestFiles
+
+
 
 
 
@@ -280,35 +323,46 @@ Sub ProcessSet(ByVal strSet)
 	
 	intActive = Int(ReadConfig(strSet, "Active"))
 	If intActive = 1 Then
+		'' Read the configuration settings from strSet
 		stFolderSource = ReadConfig(strSet, "SourceFolder")
 		strFolderArchive = ReadConfig(strSet, "FolderArchive")
-		
 		intKeepDays = Int(ReadConfig(strSet, "KeepDays"))
 		intKeepArchives = Int(ReadConfig(strSet, "KeepArchives"))
-		
+
+		'' Calculate the number of days to keep to a - value
 		intDaysBack = intKeepDays - (2 * intKeepDays)
 		dtmDateArchive = DateAdd("d", intDaysBack, Now())
+		'' Build the archive file name.
 		strFilenameArchive = ProperDateFs(dtmDateArchive)
 
-		'strFolderCollect = strFolderArchive & "\" & strSet
+		'' Build the path to the collect folder, us the temp to store the files.
 		strFolderCollect = "D:\Temp\~" & strSet
 		
-		strPathArchive = strFolderArchive & "\" & strSet & "\" & strFilenameArchive & ".7z"
+		'' Build the folder to the archive (d:\folder) and the path to the archive (d:\folder\file.7z).
+		strFolderArchive = strFolderArchive & "\" & strSet
+		strPathArchive = strFolderArchive & "\" & strFilenameArchive & ".7z"
 		
+		'' Show the variables
 		WScript.Echo vbTab & "  Source folder : " & stFolderSource
 		WScript.Echo vbTab & "Archived folder : " & strFolderArchive
 		WScript.Echo vbTab & "      Keep days : " & intKeepDays
 		WScript.Echo vbtab & " Collect folder : " & strFolderCollect
 		WScript.Echo vbTab & "   Archive date : " & dtmDateArchive
+		WScript.Echo vbTab & " Folder archive : " & strFolderArchive
 		WScript.Echo vbTab & "   Path archive : " & strPathArchive
 		WScript.Echo vbTab & "  Keep archives : " & intKeepArchives
 		
+		'' 1) Perform the action to collect all files of the current set.
+		'Call CollectFilesBeforeArchiving(stFolderSource, strFolderCollect, intKeepDays)
 		
-		Call CollectFilesBeforeArchiving(stFolderSource, strFolderCollect, intKeepDays)
+		'' 2) Compress all collected files.
+		'Call CompressCollectedFiles(strFolderCollect, strPathArchive)
 	
-		Call CompressCollectedFiles(strFolderCollect, strPathArchive)
-		
-		
+		'' 3) Only keep intKeepArchives archives in the strFolderArchive
+		'Call KeepArchives(strFolderArchive, intKeepArchives)
+		'Call KeepArchives("D:\EXPORT\000134\2015-04-11\NS00DC016", 10)
+		''Call KeepNewestFiles("D:\EXPORT\000134\2015-04-11\NS00DC016", 10)
+		Call KeepNewestFiles("D:\INDEXEDBYSPLUNK\000046\P\2015-02-11\NS00DC009", intKeepArchives)
 		
 	Else
 		WScript.Echo "Set " & strSet & " is not active (Active=0)"
