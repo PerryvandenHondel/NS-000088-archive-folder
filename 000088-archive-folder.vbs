@@ -187,18 +187,18 @@ Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, B
 	c = "robocopy.exe "
 	c = c & Chr(34) & strFolderSource & Chr(34) & " "
 	c = c & Chr(34) & strFolderCollect & Chr(34) & " "
-	c = c & "*.* "							'' All files
-	''c = c & "/move "						'' /move 		the files
-	c = c & "/z "							'' /z 			copy files in restartable mode 
-	c = c & "/s "							'' /s 			copy sub dirs
-	c = c & "/np "							'' /np 			no progress counter aka procent
+	c = c & "*.* "							'' 				All files
+	c = c & "/move "						'' 	/move 		the files
+	c = c & "/z "							'' 	/z 			copy files in restartable mode 
+	c = c & "/s "							'' 	/s 			copy sub dirs
+	c = c & "/np "							'' 	/np 		no progress counter aka procent
 	c = c & "/r:5 "							''	/r			Restart in 5 secs.
 	c = c & "/w:10 "						'' 	/w			Wait bewteen retries for 10 sec.
-	c = c & "/minlad:" & intKeepDays & " "  '' Not used for intKeepDays for Last Access Date (/minlad)
+	c = c & "/minlad:" & intKeepDays & " "  '' 	Not used for intKeepDays for Last Access Date (/minlad)
 	
-	''c = c & "/create "						'' TEST: Create 0 length files and folder stryucture
-	''c = c & "/l " 							'' TEST: Testing, do only log, not actually move files.
-	c = c & "/tee " 						'' TEST: Log to file and screen both.
+	''c = c & "/create "					''	TEST: Create 0 length files and folder stryucture
+	''c = c & "/l " 						''	TEST: Testing, do only log, not actually move files.
+	c = c & "/tee " 						''	TEST: Log to file and screen both.
 	
 	c = c & "/log:robocopy-collect.txt"
 	
@@ -210,7 +210,12 @@ End Sub '' of Sub CollectFilesBeforeArchiving
 
 
 Sub CompressCollectedFiles(strFolderCollect, strPathArchive)
+	''
+	''	Source: http://sevenzip.sourceforge.jp/chm/cmdline/switches/method.htm
+	''
+	
 	Dim		c
+	Dim		r
 	
 	'' 7za.exe a -r D:\archive-older-then\d_temp.7z D:\archive-older-then\d_temp\*.* 
 	
@@ -218,13 +223,40 @@ Sub CompressCollectedFiles(strFolderCollect, strPathArchive)
 	WScript.Echo "CompressCollectedFiles()" 
 	
 	c = "7za.exe "
-	c =	c & "a "
-	c = c & "-r "
+	c =	c & "a "			'' 	Add files to archive
+	c = c & "-r "			''	Recurse folders 
+	c = c & "-mx9 "			''	Set maximum compression. Ultra compressing
 	c = c & Chr(34) & strPathArchive & Chr(34) & " "
 	c = c & Chr(34) & strFolderCollect & "\*.*" & Chr(34)
 	
 	WScript.Echo c
+	r = RunCommand(c)
+	WScript.Echo "CompressCollectedFiles=" & r
+	
+	If r = 0 Then
+		WScript.Echo "INFO: Compression successful, deleting collection folder: " & strFolderCollect
+		Call DeleteFolder(strFolderCollect)
+	Else
+		WScript.Echo "ERROR: Compression of " & strFolderCollect & " failed with code: " & r
+	End If
 End Sub '' of Sub CompressCollectedFiles
+
+
+
+Sub DeleteFolder(filespec)
+	'//////////////////////////////////////////////////////////////////////////////
+	'//
+	'//	DeleteFolder() -- Delete a folder specified
+	'//
+	'//	filespec	The name of the folder to delete.
+	'//
+
+   	Dim fso
+   	
+   	Set fso = CreateObject("Scripting.FileSystemObject")
+   	fso.DeleteFolder filespec, True
+   	Set fso = Nothing
+End Sub
 
 
 
