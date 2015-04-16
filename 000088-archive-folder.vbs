@@ -96,6 +96,20 @@ End Sub
 
 
 
+Function ProperDateTimeInt(ByVal dt)
+	Dim		r
+	
+	r = Year(dt)
+	r = r & NumberAlign(Month(dt), 2)
+	r = r & NumberAlign(Day(dt), 2)
+	r = r & NumberAlign(Hour(dt), 2)
+	r = r & NumberAlign(Minute(dt), 2)
+	r = r & NumberAlign(Second(dt), 2)
+	ProperDateTimeInt = Int(r)
+End Function ' of Function ProperDateTime
+
+
+
 Function ProperDateFs(ByVal dtmDateTime)
 	''
 	''	Convert a system formatted date time to a proper file system date time
@@ -160,7 +174,7 @@ Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, B
 	
 	''c = c & "/create "					''	TEST: Create 0 length files and folder stryucture
 	''c = c & "/l " 						''	TEST: Testing, do only log, not actually move files.
-	c = c & "/tee " 						''	TEST: Log to file and screen both.
+	''c = c & "/tee " 						''	TEST: Log to file and screen both.
 	
 	c = c & "/log:robocopy-collect.txt"
 	
@@ -227,31 +241,38 @@ Sub KeepNewestFiles(ByVal sFolder, ByVal nToKeep)
 	Dim	tmp0
 	Dim	tmp1
 	Dim	x
+	Dim		intFolderCount
 	
 	Set oFSO = CreateObject("Scripting.FileSystemObject")
 	Set oFolder = oFSO.GetFolder(sFolder)
 	
 	'' Get the number of files in the folder.
-	nFolders = oFolder.Files.Count
+	intFolderCount = oFolder.Files.Count
+	
+	WScript.Echo "Found " & intFolderCount & " files in folder " & sFolder
 	
 	'' Resize the array to match the number of files.
-	ReDim aFolder(nFolders, 1)
-
-	n = 1
+	ReDim aFolder(intFolderCount, 1)
 	
+
+	'n = 1
+	n = 0
 	'' Get all files in the  folder and place them in the 2D array.
 	For Each oFile in oFolder.Files
-		WScript.Echo vbTab & n & ":" & vbTab & oFile.Path & vbTab & oFile.DateLastModified
-		aFolder(n,0) = oFile.DateLastModified	
-		aFolder(n,1) = oFile.Path		'' Name
+		'WScript.Echo vbTab & n & ":" & vbTab & ProperDateTimeInt(oFile.DateLastModified) & vbTab & oFile.Path
+		'' aFolder(n, 0) = ProperDateTimeInt(oFile.DateLastModified) '' Convert H:MM:SS to HH:MM:SS (alignment hours)
+		aFolder(n, 0) = ProperDateTimeInt(oFile.DateCreated) '' Convert H:MM:SS to HH:MM:SS (alignment hours)
+		aFolder(n, 1) = oFile.Path		'' Name
 		n = n + 1
 	Next
 	
 	'' Sort the array by dates, newest first
 	x = n - 1
-	For n = 1 to x - 1
+	
+	For n = 0 to x - 1
 		For m = n + 1 to x
 			If aFolder(m, 0) > aFolder(n, 0) then
+				''WScript.Echo "m=" & aFolder(m, 0) & " > n=" & aFolder(n, 0) & " = SWAP!"
 				tmp0 = aFolder(m, 0)
 				tmp1 = aFolder(m, 1)
 				aFolder(m, 0) = aFolder(n, 0)
@@ -262,27 +283,20 @@ Sub KeepNewestFiles(ByVal sFolder, ByVal nToKeep)
 		Next
 	Next
 
-	WScript.Echo 
-	'' If the number of files to keep is larger then the number of folders in the folder.
-	If nFolders > nToKeep Then
-		WScript.Echo  vbTab & x & ":" & vbTab & aFolder(x, 1) & vbTab & aFolder(x, 0) & vbTab
-		For x = nToKeep + 1 To nFolders
-			WScript.Echo vbTab & vbTab & "DELETE"
-			'oFSO.DeleteFile aFolder(x, 1)
-			
-			If Err.Number <> 0 Then
-				WScript.Echo "Could not delete file " & aFolder(x, 1)
-			End If
-		Next
-	Else
-		WScript.Echo "Nothing to delete!"
-	End If
+	'WScript.Echo 
+	Dim	s
+	For n = 0 To intFolderCount - 1
+		's = vbTab & n & ":"& vbTab & aFolder(n, 0) & vbTab & aFolder(n, 1)
+		If n > nToKeep - 1 Then
+			'WScript.Echo s & vbTab & "DELETE!"
+		'Else
+		'	WScript.Echo s
+		End If
+	Next
 	
 	Set oFolder = Nothing
 	Set oFSO = Nothing
 End Sub '' of Sub KeepNewestFiles
-
-
 
 
 
@@ -353,16 +367,20 @@ Sub ProcessSet(ByVal strSet)
 		WScript.Echo vbTab & "  Keep archives : " & intKeepArchives
 		
 		'' 1) Perform the action to collect all files of the current set.
-		'Call CollectFilesBeforeArchiving(stFolderSource, strFolderCollect, intKeepDays)
+		Call CollectFilesBeforeArchiving(stFolderSource, strFolderCollect, intKeepDays)
 		
 		'' 2) Compress all collected files.
-		'Call CompressCollectedFiles(strFolderCollect, strPathArchive)
+		Call CompressCollectedFiles(strFolderCollect, strPathArchive)
 	
 		'' 3) Only keep intKeepArchives archives in the strFolderArchive
-		'Call KeepArchives(strFolderArchive, intKeepArchives)
+		Call KeepNewestFiles(strFolderArchive, intKeepArchives)
+		
+		
+		
 		'Call KeepArchives("D:\EXPORT\000134\2015-04-11\NS00DC016", 10)
-		''Call KeepNewestFiles("D:\EXPORT\000134\2015-04-11\NS00DC016", 10)
-		Call KeepNewestFiles("D:\INDEXEDBYSPLUNK\000046\P\2015-02-11\NS00DC009", intKeepArchives)
+		'Call KeepNewestFiles("D:\EXPORT\000134\2015-04-11\NS00DC016", 2)
+		'Call KeepNewestFiles("D:\INDEXEDBYSPLUNK\000046\P\2015-02-11\NS00DC009", 3)
+		'Call KeepNewestFiles("D:\EXPORT\000134\2015-04-11\NS00DC011", 10)
 		
 	Else
 		WScript.Echo "Set " & strSet & " is not active (Active=0)"
