@@ -174,7 +174,7 @@ Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, B
 	
 	''c = c & "/create "					''	TEST: Create 0 length files and folder stryucture
 	''c = c & "/l " 						''	TEST: Testing, do only log, not actually move files.
-	''c = c & "/tee " 						''	TEST: Log to file and screen both.
+	c = c & "/tee " 						''	TEST: Log to file and screen both.
 	
 	c = c & "/log:robocopy-collect.txt"
 	
@@ -249,7 +249,7 @@ Sub KeepNewestFiles(ByVal sFolder, ByVal nToKeep)
 	'' Get the number of files in the folder.
 	intFolderCount = oFolder.Files.Count
 	
-	WScript.Echo "Found " & intFolderCount & " files in folder " & sFolder
+	WScript.Echo "Found " & intFolderCount & " archives in folder " & sFolder
 	
 	'' Resize the array to match the number of files.
 	ReDim aFolder(intFolderCount, 1)
