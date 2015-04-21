@@ -300,7 +300,7 @@ End Sub '' of Sub KeepNewestFiles
 
 
 
-Sub DeleteFolder(filespec)
+Sub DeleteFolder(ByVal filespec)
 	'//////////////////////////////////////////////////////////////////////////////
 	'//
 	'//	DeleteFolder() -- Delete a folder specified
@@ -311,8 +311,13 @@ Sub DeleteFolder(filespec)
    	Dim fso
    	
    	Set fso = CreateObject("Scripting.FileSystemObject")
+	On Error Resume Next
    	fso.DeleteFolder filespec, True
-   	Set fso = Nothing
+	If Err.Number <> 0 Then
+		WScript.Echo "ERROR: Could not delete " & filespec & ", error " & Err.Number
+	End If
+   	
+	Set fso = Nothing
 End Sub
 
 
