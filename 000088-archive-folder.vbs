@@ -15,6 +15,8 @@
 ''
 ''
 ''	VERSION:
+''		02	2015-04-23	Modification
+''						1) CalcMinlad function added.
 ''		01	2015-04-15	First version
 '' 
 ''	SUBS AND FUNCTIONs:
@@ -22,6 +24,7 @@
 ''		Function NumberAlign
 ''		Function ProperDateFs
 ''		Function ProperDateTime
+''		Function CalcMinlad
 ''		Function RunCommand
 ''		Sub MakeFolder
 ''		Sub ProcessSet
@@ -37,7 +40,7 @@
 ''	archive file.
 ''
 ''	---------------------------------------------------------------------------
-
+'' 
 
 
 
@@ -154,6 +157,33 @@ End Function ' of NumberAlign
 
 
 
+
+Function CalcMinlad(ByVal intDays)
+	'' 
+	''	Calc for the /minlad option of Robocopy a valid datetime
+	''
+	''	CalcMinlad(10) returns 2015-03-13 when the todays date is 2015-04-23
+	Dim		dtmDateMinlad
+	Dim		r
+	Dim		dtmNow
+
+	dtmNow = Now()
+	
+	intDays = (intDays - (2 * intDays))
+	
+	dtmDateMinlad = DateAdd("d", dtmNow, intDays)
+	
+	'WScript.Echo dtmDateMinlad
+	
+	r = NumberAlign(Year(dtmDateMinlad), 4) & NumberAlign(Month(dtmDateMinlad), 2) & NumberAlign(Day(dtmDateMinlad), 2)
+	
+	WScript.Echo "Current date " & dtmNow & intDays & " days results to robocopy option minlad of " & r
+	
+	CalcMinlad = r
+End Function '' of Function CalcMinlad
+
+
+
 Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, ByVal intKeepDays)
 	Dim		c
 	Dim		r
@@ -170,10 +200,10 @@ Sub CollectFilesBeforeArchiving(ByVal strFolderSource, ByVal strFolderCollect, B
 	c = c & "/np "							'' 	/np 		no progress counter aka procent
 	c = c & "/r:5 "							''	/r			Restart in 5 secs.
 	c = c & "/w:10 "						'' 	/w			Wait bewteen retries for 10 sec.
-	c = c & "/minlad:" & intKeepDays & " "  '' 	Not used for intKeepDays for Last Access Date (/minlad)
+	c = c & "/minlad:" & CalcMinlad(intKeepDays) & " "  '' 	Not used for intKeepDays for Last Access Date (/minlad)
 	
-	''c = c & "/create "					''	TEST: Create 0 length files and folder stryucture
-	''c = c & "/l " 						''	TEST: Testing, do only log, not actually move files.
+	'c = c & "/create "					''	TEST: Create 0 length files and folder stryucture
+	'c = c & "/l " 						''	TEST: Testing, do only log, not actually move files.
 	c = c & "/tee " 						''	TEST: Log to file and screen both.
 	
 	c = c & "/log:robocopy-collect.txt"
