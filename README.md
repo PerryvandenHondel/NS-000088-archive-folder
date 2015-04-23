@@ -1,2 +1,3 @@
-#Archive Older Then 
-# NS 88 Archive Folder 
+# Archive folders based on a configuration files with settings
+
+NS 88 
